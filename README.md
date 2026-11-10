@@ -5,7 +5,7 @@ Package Python pour lire et Ã©crire des secrets dans OVHcloud OKMS (Secret Man
 ## Installation
 
 ```bash
-pip install "git+https://github.com/dso-conseils/dso-secrets.git@v0.3.0"
+pip install "git+https://github.com/dso-conseils/dso-secrets.git@v0.3.1"
 ```
 
 ## Configuration
