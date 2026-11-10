@@ -9,15 +9,13 @@ Le package ne contient aucun secret. Les identifiants viennent des variables d'e
 
 ## Installation
 
-Le dépôt est privé : pip a besoin d'un accès GitHub.
+Le dépôt est public et ne contient aucun secret : aucun jeton n'est nécessaire, ni sur un poste, ni en CI, ni dans un container.
 
 ```bash
 pip install "git+https://github.com/dso-conseils/dso-secrets.git@v0.1.0"
 ```
 
-- **Poste :** `gh auth login` suffit si git utilise les identifiants de `gh` (`gh auth setup-git`).
-- **CI / container :** injecter un jeton en lecture sur ce dépôt (PAT à portée limitée ou deploy key) et l'utiliser dans l'URL (`git+https://<jeton>@github.com/...`). Je n'ai pas testé ce cas ; le `GITHUB_TOKEN` d'un workflow ne lit pas un autre dépôt privé par défaut.
-- Figer toujours un tag (`@v0.1.0`).
+Figer toujours un tag (`@v0.1.0`).
 
 ## Configuration
 
@@ -90,7 +88,7 @@ Préférer `--stdin-json` à `--set` pour les valeurs sensibles (l'historique du
 ### GitHub Actions
 
 ```yaml
-- run: pip install "git+https://${{ secrets.DSO_PACKAGES_TOKEN }}@github.com/dso-conseils/dso-secrets.git@v0.1.0"
+- run: pip install "git+https://github.com/dso-conseils/dso-secrets.git@v0.1.0"
 - run: dso-secrets get infra-ovh/main/argocd-admin-password --key value --github-env ARGOCD_ADMIN_PASSWORD
   env:
     DSO_OKMS_USER: ${{ secrets.DSO_OKMS_USER }}
