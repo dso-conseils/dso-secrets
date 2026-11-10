@@ -130,11 +130,9 @@ class RemoteStore:
             return False
 
     def create(self, path: str, data: Dict[str, str]) -> None:
-        body = {
-            "path": path,
-            "version": {"data": data},
-            "metadata": {"maxVersions": self._config.max_versions},
-        }
+        body = {"path": path, "version": {"data": data}}
+        if self._config.max_versions is not None:
+            body["metadata"] = {"maxVersions": self._config.max_versions}
         self._request(self._write_source(), "POST", self._url(), json=body)
 
     def update(self, path: str, data: Dict[str, str]) -> None:

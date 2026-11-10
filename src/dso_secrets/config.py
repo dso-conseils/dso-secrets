@@ -15,19 +15,17 @@ ENV_FILE = "DSO_SECRETS_CONFIG"
 DEFAULT_FILENAME = "dso-secrets.yml"
 
 FORBIDDEN_KEYS = {"client_secret", "client_id", "password", "secret", "token", "pass", "user"}
-DEFAULT_API_URL = "https://eu.api.ovh.com/v2"
-DEFAULT_TOKEN_URL = "https://www.ovh.com/auth/oauth2/token"
 
 
 @dataclass(frozen=True)
 class RemoteConfig:
     okms_id: str
-    api_url: str = DEFAULT_API_URL
-    token_url: str = DEFAULT_TOKEN_URL
-    read_user_env: str = "DSO_OKMS_USER"
-    read_pass_env: str = "DSO_OKMS_PASS"
+    api_url: str
+    token_url: str
+    read_user_env: str
+    read_pass_env: str
     write_secret: Optional[str] = None
-    max_versions: int = 3
+    max_versions: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -59,8 +57,10 @@ def parse_config(data: Mapping[str, Any]) -> Config:
     mode = data.get("mode")
     if mode == "remote":
         section = data.get("remote") or {}
-        if not section.get("okms_id"):
-            raise ConfigError("remote.okms_id est obligatoire en mode remote.")
+        required = ("okms_id", "api_url", "token_url", "read_user_env", "read_pass_env")
+        missing = [key for key in required if not section.get(key)]
+        if missing:
+            raise ConfigError(f"Parametres remote obligatoires manquants : {missing}")
         known = {f for f in RemoteConfig.__dataclass_fields__}
         unknown = set(section) - known
         if unknown:

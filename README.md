@@ -19,7 +19,7 @@ Figer toujours un tag (`@v0.1.0`).
 
 ## Configuration
 
-Copier [dso-secrets.example.yml](dso-secrets.example.yml). Le YAML ne contient **que** des noms de variables d'environnement : une clé du type `client_secret`, `password` ou `token` est refusée.
+Le package n'installe aucun YAML : `pip install` ne copie que le code dans `site-packages`. Copier [dso-secrets.example.yml](dso-secrets.example.yml) (disponible dans le dépôt), le renommer `dso-secrets.yml` et le remplir. Le code ne contient aucune valeur par défaut : `okms_id`, `api_url`, `token_url`, `read_user_env` et `read_pass_env` sont obligatoires, `write_secret` et `max_versions` facultatifs. Le YAML ne contient **que** des noms de variables d'environnement : une clé du type `client_secret`, `password` ou `token` est refusée.
 
 ```yaml
 mode: remote # remote ou local
@@ -50,7 +50,7 @@ Seule la section correspondant à `mode` est lue.
 
 | Variable | Contenu |
 |---|---|
-| `DSO_OKMS_USER` / `DSO_OKMS_PASS` | `client_id` / `client_secret` du compte de service en **lecture** (noms modifiables dans le YAML) |
+| `DSO_OKMS_USER` / `DSO_OKMS_PASS` | `client_id` / `client_secret` du compte de service en **lecture** (les noms de variables sont ceux déclarés dans le YAML) |
 
 Le compte d'**écriture** n'est jamais passé en variable : ses `client_id` et `client_secret` sont lus dans le secret OKMS `remote.write_secret`, qui doit contenir ces deux clés. Ce secret est donc lisible par le compte de lecture, sauf si la politique IAM le restreint (filtrage par chemin non testé).
 

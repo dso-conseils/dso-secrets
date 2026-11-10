@@ -60,7 +60,12 @@ def remote(monkeypatch):
     session = FakeSession()
     session.secrets["dso/accounts/okms-write"] = {"client_id": "writer", "client_secret": "y"}
     cfg = RemoteConfig(
-        okms_id="ID", api_url="https://api.test/v2", write_secret="dso/accounts/okms-write"
+        okms_id="ID",
+        api_url="https://api.test/v2",
+        token_url="https://token.test",
+        read_user_env="DSO_OKMS_USER",
+        read_pass_env="DSO_OKMS_PASS",
+        write_secret="dso/accounts/okms-write",
     )
     return SecretStore(RemoteStore(cfg, session)), session
 
@@ -91,7 +96,12 @@ def test_remote_create_existing_and_update_missing(remote):
 
 def test_remote_missing_credentials(monkeypatch):
     monkeypatch.delenv("DSO_OKMS_USER", raising=False)
-    store = SecretStore(RemoteStore(RemoteConfig(okms_id="ID"), FakeSession()))
+    store = SecretStore(
+        RemoteStore(
+            RemoteConfig("ID", "https://api.test/v2", "https://token.test", "DSO_OKMS_USER", "DSO_OKMS_PASS"),
+            FakeSession(),
+        )
+    )
     with pytest.raises(ConfigError):
         store.list()
 
@@ -131,10 +141,21 @@ def test_config_requires_mode_values():
         parse_config({"mode": "local", "local": {}})
 
 
+REMOTE_YAML = (
+    "mode: remote\nremote:\n  okms_id: abc\n  api_url: https://a\n  token_url: https://t\n"
+    "  read_user_env: U\n  read_pass_env: P\n"
+)
+
+
+def test_config_remote_requires_all_mandatory_parameters():
+    with pytest.raises(ConfigError, match="manquants"):
+        parse_config({"mode": "remote", "remote": {"okms_id": "x"}})
+
+
 def test_config_inline_yaml_has_priority(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "dso-secrets.yml").write_text("mode: local\nlocal:\n  env_file: x\n", encoding="utf-8")
-    monkeypatch.setenv("DSO_SECRETS_CONFIG_YAML", "mode: remote\nremote:\n  okms_id: abc\n")
+    monkeypatch.setenv("DSO_SECRETS_CONFIG_YAML", REMOTE_YAML)
     assert load_config().mode == "remote"
 
 
@@ -144,7 +165,7 @@ def test_config_file_env_and_cwd(monkeypatch, tmp_path):
     (tmp_path / "dso-secrets.yml").write_text("mode: local\nlocal:\n  env_file: x\n", encoding="utf-8")
     assert load_config().mode == "local"
     other = tmp_path / "other.yml"
-    other.write_text("mode: remote\nremote:\n  okms_id: abc\n", encoding="utf-8")
+    other.write_text(REMOTE_YAML, encoding="utf-8")
     monkeypatch.setenv("DSO_SECRETS_CONFIG", str(other))
     assert load_config().mode == "remote"
 
