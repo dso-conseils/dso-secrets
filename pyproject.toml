@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dso-secrets"
-version = "0.1.0"
+version = "0.3.2"
 description = "CRUD de secrets OVHcloud OKMS (Secret Manager) avec mode distant et mode local hors ligne"
 readme = "README.md"
 requires-python = ">=3.9"
