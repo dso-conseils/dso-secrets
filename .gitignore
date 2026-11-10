@@ -1,0 +1,9 @@
+__pycache__/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+*.env
+dso-secrets.yml
+.dso-secrets.yml
