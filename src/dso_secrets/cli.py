@@ -5,9 +5,11 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from . import DsoSecretsError, open_store
+from .config import config_path, write_config
 
 
 def _parse_pairs(pairs: List[str]) -> Dict[str, str]:
@@ -41,10 +43,51 @@ def _write_github_env(name: str, value: str) -> None:
         handle.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
 
 
+REMOTE_PROMPTS = (
+    ("okms_id", "ID du domaine OKMS", True),
+    ("api_url", "URL de l'API OVHcloud", True),
+    ("token_url", "URL du jeton OAuth2", True),
+    ("read_user_env", "Nom de la variable d'environnement du client_id de lecture", True),
+    ("read_pass_env", "Nom de la variable d'environnement du client_secret de lecture", True),
+    ("write_secret", "Chemin du secret OKMS du compte d'ecriture (facultatif)", False),
+    ("max_versions", "Nombre maximum de versions par secret (facultatif)", False),
+)
+
+
+def _ask(label: str, required: bool) -> Optional[str]:
+    while True:
+        answer = input(f"{label} : ").strip()
+        if answer or not required:
+            return answer or None
+        print("Valeur obligatoire.")
+
+
+def init_config(args: argparse.Namespace) -> int:
+    target = Path(args.output) if args.output else config_path()
+    if target.exists() and not args.force:
+        raise DsoSecretsError(f"{target} existe deja : utiliser --force pour le remplacer.")
+    if args.mode == "local":
+        data: Dict[str, object] = {"mode": "local", "local": {"env_file": _ask("Chemin du fichier .env local", True)}}
+    else:
+        remote: Dict[str, object] = {}
+        for key, label, required in REMOTE_PROMPTS:
+            value = _ask(label, required)
+            if value is not None:
+                remote[key] = int(value) if key == "max_versions" else value
+        data = {"mode": "remote", "remote": remote}
+    print(f"Configuration ecrite : {write_config(data, target, args.force)}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dso-secrets", description=__doc__)
-    parser.add_argument("--config", help="chemin du YAML (sinon DSO_SECRETS_CONFIG_YAML, DSO_SECRETS_CONFIG, ./dso-secrets.yml, ~/.dso-secrets.yml)")
+    parser.add_argument("--config", help="chemin du YAML (sinon DSO_SECRETS_CONFIG_YAML, puis ~/.dso-secrets/config.yml)")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    init = sub.add_parser("init", help="creer le YAML (~/.dso-secrets/config.yml) en posant les questions")
+    init.add_argument("--mode", choices=["remote", "local"], default="remote")
+    init.add_argument("--output", help="ecrire ailleurs que dans ~/.dso-secrets/config.yml")
+    init.add_argument("--force", action="store_true", help="remplacer un fichier existant")
 
     get = sub.add_parser("get", help="lire un secret (JSON) ou une cle")
     get.add_argument("path")
@@ -71,6 +114,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run(args: argparse.Namespace) -> int:
+    if args.command == "init":
+        return init_config(args)
     store = open_store(config_path=args.config)
     if args.command == "get":
         value = store.get(args.path, args.key)

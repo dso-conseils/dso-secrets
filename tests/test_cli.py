@@ -11,6 +11,20 @@ def _local_env(tmp_path):
     return str(cfg)
 
 
+def test_cli_init_remote_writes_answers(tmp_path, monkeypatch, capsys):
+    answers = iter(["abc", "https://a", "https://t", "U", "P", "", "3"])
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(answers))
+    target = tmp_path / "cfg" / "config.yml"
+    assert cli.main(["init", "--output", str(target)]) == 0
+    from dso_secrets.config import load_config
+
+    config = load_config(str(target))
+    assert config.remote.okms_id == "abc" and config.remote.read_user_env == "U"
+    assert config.remote.write_secret is None and config.remote.max_versions == 3
+    assert cli.main(["init", "--output", str(target)]) == 1
+    assert "--force" in capsys.readouterr().err
+
+
 def test_cli_get_and_list(tmp_path, capsys):
     cfg = _local_env(tmp_path)
     assert cli.main(["--config", cfg, "get", "app/main/db", "--key", "user"]) == 0

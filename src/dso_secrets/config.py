@@ -11,8 +11,8 @@ import yaml
 from .errors import ConfigError
 
 ENV_YAML = "DSO_SECRETS_CONFIG_YAML"
-ENV_FILE = "DSO_SECRETS_CONFIG"
-DEFAULT_FILENAME = "dso-secrets.yml"
+CONFIG_DIR = ".dso-secrets"
+CONFIG_FILE = "config.yml"
 
 FORBIDDEN_KEYS = {"client_secret", "client_id", "password", "secret", "token", "pass", "user"}
 
@@ -77,23 +77,33 @@ def parse_config(data: Mapping[str, Any]) -> Config:
     raise ConfigError("mode doit valoir 'remote' ou 'local'.")
 
 
-def _candidates(path: Optional[str]) -> list[Path]:
-    if path:
-        return [Path(path)]
-    env_path = os.environ.get(ENV_FILE)
-    found = [Path(env_path)] if env_path else []
-    found += [Path.cwd() / DEFAULT_FILENAME, Path.home() / f".{DEFAULT_FILENAME}"]
-    return found
+def config_path() -> Path:
+    """Emplacement unique du YAML : ~/.dso-secrets/config.yml (Windows, Linux, container)."""
+    return Path.home() / CONFIG_DIR / CONFIG_FILE
 
 
 def load_config(path: Optional[str] = None) -> Config:
-    """Ordre : DSO_SECRETS_CONFIG_YAML (contenu), chemin explicite ou DSO_SECRETS_CONFIG, ./dso-secrets.yml, ~/.dso-secrets.yml."""
-    inline = os.environ.get(ENV_YAML)
-    if inline and not path:
-        return parse_config(yaml.safe_load(inline))
-    for candidate in _candidates(path):
-        if candidate.is_file():
-            return parse_config(yaml.safe_load(candidate.read_text(encoding="utf-8")))
-    raise ConfigError(
-        f"Aucune configuration trouvee ({ENV_YAML}, {ENV_FILE}, ./{DEFAULT_FILENAME}, ~/.{DEFAULT_FILENAME})."
-    )
+    """Ordre : chemin explicite (--config), DSO_SECRETS_CONFIG_YAML (contenu), ~/.dso-secrets/config.yml."""
+    if path:
+        target = Path(path)
+    else:
+        inline = os.environ.get(ENV_YAML)
+        if inline:
+            return parse_config(yaml.safe_load(inline))
+        target = config_path()
+    if not target.is_file():
+        raise ConfigError(
+            f"Configuration introuvable : {target}. Creer le fichier avec `dso-secrets init` "
+            f"ou fournir son contenu dans {ENV_YAML}."
+        )
+    return parse_config(yaml.safe_load(target.read_text(encoding="utf-8")))
+
+
+def write_config(data: Mapping[str, Any], target: Optional[Path] = None, force: bool = False) -> Path:
+    parse_config(data)
+    target = target or config_path()
+    if target.exists() and not force:
+        raise ConfigError(f"{target} existe deja : utiliser --force pour le remplacer.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(yaml.safe_dump(dict(data), sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return target

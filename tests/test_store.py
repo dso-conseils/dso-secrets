@@ -152,22 +152,26 @@ def test_config_remote_requires_all_mandatory_parameters():
         parse_config({"mode": "remote", "remote": {"okms_id": "x"}})
 
 
-def test_config_inline_yaml_has_priority(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "dso-secrets.yml").write_text("mode: local\nlocal:\n  env_file: x\n", encoding="utf-8")
+def test_config_inline_yaml_has_priority_over_home_file(monkeypatch, tmp_path):
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    (tmp_path / ".dso-secrets").mkdir()
+    (tmp_path / ".dso-secrets" / "config.yml").write_text("mode: local\nlocal:\n  env_file: x\n", encoding="utf-8")
+    assert load_config().mode == "local"
     monkeypatch.setenv("DSO_SECRETS_CONFIG_YAML", REMOTE_YAML)
     assert load_config().mode == "remote"
 
 
-def test_config_file_env_and_cwd(monkeypatch, tmp_path):
+def test_config_missing_points_to_init(monkeypatch, tmp_path):
     monkeypatch.delenv("DSO_SECRETS_CONFIG_YAML", raising=False)
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "dso-secrets.yml").write_text("mode: local\nlocal:\n  env_file: x\n", encoding="utf-8")
-    assert load_config().mode == "local"
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    with pytest.raises(ConfigError, match="dso-secrets init"):
+        load_config()
+
+
+def test_config_explicit_path(tmp_path):
     other = tmp_path / "other.yml"
     other.write_text(REMOTE_YAML, encoding="utf-8")
-    monkeypatch.setenv("DSO_SECRETS_CONFIG", str(other))
-    assert load_config().mode == "remote"
+    assert load_config(str(other)).mode == "remote"
 
 
 def test_open_store_local(tmp_path):

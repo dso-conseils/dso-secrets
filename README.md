@@ -1,4 +1,4 @@
-# dso-secrets
+﻿# dso-secrets
 
 CRUD de secrets **OVHcloud OKMS (Secret Manager)** pour les projets dso-conseils, avec deux modes :
 
@@ -19,33 +19,41 @@ Figer toujours un tag (`@v0.1.0`).
 
 ## Configuration
 
-Le package n'installe aucun YAML : `pip install` ne copie que le code dans `site-packages`. Copier [dso-secrets.example.yml](dso-secrets.example.yml) (disponible dans le dépôt), le renommer `dso-secrets.yml` et le remplir. Le code ne contient aucune valeur par défaut : `okms_id`, `api_url`, `token_url`, `read_user_env` et `read_pass_env` sont obligatoires, `write_secret` et `max_versions` facultatifs. Le YAML ne contient **que** des noms de variables d'environnement : une clé du type `client_secret`, `password` ou `token` est refusée.
+Le YAML est toujours au **même endroit** : `~/.dso-secrets/config.yml` (sous Windows `C:\Users\<toi>\.dso-secrets\config.yml`). Le package n'en installe aucun et le code ne contient aucune valeur : tout vient de ce fichier.
+
+Pour le créer, lancer une fois :
+
+```bash
+dso-secrets init
+```
+
+La commande pose les questions une par une, sans valeur proposée, écrit le fichier et affiche son chemin. `--force` remplace un fichier existant, `--mode local` prépare le mode hors ligne, `--output` écrit ailleurs.
+
+Résultat (exemple de forme, les valeurs sont les tiennes) :
 
 ```yaml
 mode: remote # remote ou local
 
 remote:
-  okms_id: <id du domaine OKMS>
-  api_url: https://eu.api.ovh.com/v2
-  token_url: https://www.ovh.com/auth/oauth2/token
-  read_user_env: DSO_OKMS_USER
-  read_pass_env: DSO_OKMS_PASS
-  write_secret: dso-conseils/accounts/okms-write
-  max_versions: 3
+  okms_id: ...                 # obligatoire
+  api_url: ...                 # obligatoire
+  token_url: ...               # obligatoire
+  read_user_env: ...           # obligatoire : NOM de la variable contenant le client_id de lecture
+  read_pass_env: ...           # obligatoire : NOM de la variable contenant le client_secret de lecture
+  write_secret: ...            # facultatif : chemin du secret OKMS du compte d'écriture
+  max_versions: 3              # facultatif
 
 local:
-  env_file: ./dso-secrets.env
+  env_file: ...
 ```
 
-Seule la section correspondant à `mode` est lue.
+Seule la section correspondant à `mode` est lue. Une clé du type `client_secret`, `password` ou `token` est refusée : le YAML ne contient jamais de secret.
 
-### Où le package cherche le YAML (premier trouvé)
+### Où le package lit le YAML (premier trouvé)
 
-1. `DSO_SECRETS_CONFIG_YAML` : le **contenu** du YAML (secret GitHub, Secret ou ConfigMap Kubernetes exposé en variable, `docker run -e`).
-2. `--config <fichier>` ou `DSO_SECRETS_CONFIG` : chemin d'un fichier (ConfigMap monté, `/run/secrets/...`).
-3. `./dso-secrets.yml`
-4. `~/.dso-secrets.yml`
-
+1. `--config <fichier>` (option de la commande).
+2. `DSO_SECRETS_CONFIG_YAML` : le **contenu** du YAML en variable (secret GitHub, Secret ou ConfigMap Kubernetes exposé en variable, `docker run -e`).
+3. `~/.dso-secrets/config.yml`. Dans un container, monter le fichier à cet emplacement.
 ### Identifiants
 
 | Variable | Contenu |
@@ -139,3 +147,4 @@ Un secret regroupe les clés liées (par exemple `user` et `password`) plutôt q
 pip install -e ".[test]"
 pytest
 ```
+
