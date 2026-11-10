@@ -44,19 +44,20 @@ def _write_github_env(name: str, value: str) -> None:
 
 
 REMOTE_PROMPTS = (
-    ("okms_id", "ID du domaine OKMS", True),
-    ("api_url", "URL de l'API OVHcloud", True),
-    ("token_url", "URL du jeton OAuth2", True),
-    ("read_user_env", "Nom de la variable d'environnement du client_id de lecture", True),
-    ("read_pass_env", "Nom de la variable d'environnement du client_secret de lecture", True),
-    ("write_secret", "Chemin du secret OKMS du compte d'ecriture (facultatif)", False),
-    ("max_versions", "Nombre maximum de versions par secret (facultatif)", False),
+    ("okms_id", "ID du domaine OKMS", True, None),
+    ("api_url", "URL de l'API OVHcloud", True, "https://api.eu.ovhcloud.com/v2"),
+    ("token_url", "URL du jeton OAuth2", True, "https://www.ovh.com/auth/oauth2/token"),
+    ("read_user_env", "Nom de la variable d'environnement du client_id de lecture", True, None),
+    ("read_pass_env", "Nom de la variable d'environnement du client_secret de lecture", True, None),
+    ("write_secret", "Chemin du secret OKMS du compte d'ecriture (facultatif)", False, None),
+    ("max_versions", "Nombre maximum de versions par secret", True, "3"),
 )
 
 
-def _ask(label: str, required: bool) -> Optional[str]:
+def _ask(label: str, required: bool, default: Optional[str] = None) -> Optional[str]:
+    suffix = f" [{default}]" if default else ""
     while True:
-        answer = input(f"{label} : ").strip()
+        answer = input(f"{label}{suffix} : ").strip() or (default or "")
         if answer or not required:
             return answer or None
         print("Valeur obligatoire.")
@@ -70,8 +71,8 @@ def init_config(args: argparse.Namespace) -> int:
         data: Dict[str, object] = {"mode": "local", "local": {"env_file": _ask("Chemin du fichier .env local", True)}}
     else:
         remote: Dict[str, object] = {}
-        for key, label, required in REMOTE_PROMPTS:
-            value = _ask(label, required)
+        for key, label, required, default in REMOTE_PROMPTS:
+            value = _ask(label, required, default)
             if value is not None:
                 remote[key] = int(value) if key == "max_versions" else value
         data = {"mode": "remote", "remote": remote}

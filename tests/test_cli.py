@@ -12,7 +12,7 @@ def _local_env(tmp_path):
 
 
 def test_cli_init_remote_writes_answers(tmp_path, monkeypatch, capsys):
-    answers = iter(["abc", "https://a", "https://t", "U", "P", "", "3"])
+    answers = iter(["abc", "", "", "U", "P", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt="": next(answers))
     target = tmp_path / "cfg" / "config.yml"
     assert cli.main(["init", "--output", str(target)]) == 0
@@ -20,6 +20,8 @@ def test_cli_init_remote_writes_answers(tmp_path, monkeypatch, capsys):
 
     config = load_config(str(target))
     assert config.remote.okms_id == "abc" and config.remote.read_user_env == "U"
+    assert config.remote.api_url == "https://api.eu.ovhcloud.com/v2"
+    assert config.remote.token_url == "https://www.ovh.com/auth/oauth2/token"
     assert config.remote.write_secret is None and config.remote.max_versions == 3
     assert cli.main(["init", "--output", str(target)]) == 1
     assert "--force" in capsys.readouterr().err
