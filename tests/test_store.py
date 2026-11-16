@@ -1,10 +1,13 @@
 import json
+import os
+import subprocess
+import sys
 
 import pytest
 
 from dso_secrets import SecretStore, open_store
 from dso_secrets.config import load_config, parse_config
-from dso_secrets.errors import ConfigError, NotFoundError, ReadOnlyError
+from dso_secrets.errors import ConfigError, DsoSecretsError, NotFoundError
 from dso_secrets.local import LocalStore, format_env, parse_env
 from dso_secrets.remote import RemoteConfig, RemoteStore
 
@@ -111,14 +114,61 @@ def test_env_roundtrip_with_newlines():
     assert parse_env(format_env(secrets)) == secrets
 
 
-def test_local_is_read_only(tmp_path):
+def test_isolated_crud_persists_and_preserves_other_secrets(tmp_path):
     file = tmp_path / "s.env"
-    file.write_text("a/b#k=v\n", encoding="utf-8")
+    file.write_text("# existing note\na/b#k=v\nother#password=existing\n", encoding="utf-8")
     store = SecretStore(LocalStore(str(file)))
-    assert store.get("a/b", "k") == "v"
-    assert store.read_only
-    with pytest.raises(ReadOnlyError):
-        store.delete("a/b")
+    second = SecretStore(LocalStore(str(file)))
+    assert not store.read_only
+    store.create("new", {"special": " slash\\n \n = ", "empty": ""})
+    assert second.get("new") == {"special": " slash\\n \n = ", "empty": ""}
+    assert second.get("other") == {"password": "existing"}
+    assert "# existing note" in file.read_text(encoding="utf-8")
+    store.update("new", {})
+    assert second.get("new") == {}
+    assert store.upsert("new", {"x": "y"}) == "updated"
+    assert second.upsert("newer", {"x": "z"}) == "created"
+    store.delete("new")
+    assert not second.exists("new")
+    assert second.list() == ["a/b", "newer", "other"]
+    with pytest.raises(DsoSecretsError):
+        store.create("other", {"password": "overwrite"})
+    with pytest.raises(NotFoundError):
+        store.update("missing", {})
+    with pytest.raises(NotFoundError):
+        store.delete("missing")
+    assert second.get("other") == {"password": "existing"}
+
+
+def test_isolated_concurrent_processes_do_not_lose_secrets(tmp_path):
+    file = tmp_path / "s.env"
+    file.write_text("existing#key=kept\n", encoding="utf-8")
+    code = (
+        "import sys; from dso_secrets.local import LocalStore; "
+        "LocalStore(sys.argv[1]).create(sys.argv[2], {'key': 'value'})"
+    )
+    processes = [
+        subprocess.Popen([sys.executable, "-c", code, str(file), f"secret-{i}"])
+        for i in range(4)
+    ]
+    assert [process.wait(timeout=30) for process in processes] == [0] * len(processes)
+    store = LocalStore(str(file))
+    assert store.list() == ["existing", "secret-0", "secret-1", "secret-2", "secret-3"]
+    assert store.get("existing") == {"key": "kept"}
+
+
+def test_failed_isolated_write_keeps_previous_file(tmp_path, monkeypatch):
+    file = tmp_path / "s.env"
+    original = "existing#key=kept\n"
+    file.write_text(original, encoding="utf-8")
+    store = LocalStore(str(file))
+    def fail_replace(source, target):
+        raise OSError("replacement failed")
+    monkeypatch.setattr(os, "replace", fail_replace)
+    with pytest.raises(OSError, match="replacement failed"):
+        store.create("new", {"key": "value"})
+    assert file.read_text(encoding="utf-8") == original
+    assert list(tmp_path.glob(".dso-secrets-*")) == []
 
 
 def test_export_then_local(remote, tmp_path):
@@ -138,7 +188,9 @@ def test_config_requires_mode_values():
     with pytest.raises(ConfigError):
         parse_config({"mode": "auto"})
     with pytest.raises(ConfigError):
-        parse_config({"mode": "local", "local": {}})
+        parse_config({"mode": "isolated", "isolated": {}})
+    with pytest.raises(ConfigError):
+        parse_config({"mode": "local", "local": {"env_file": "x"}})
 
 
 REMOTE_YAML = (
@@ -155,8 +207,8 @@ def test_config_remote_requires_all_mandatory_parameters():
 def test_config_inline_yaml_has_priority_over_home_file(monkeypatch, tmp_path):
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     (tmp_path / ".dso-secrets").mkdir()
-    (tmp_path / ".dso-secrets" / "config.yml").write_text("mode: local\nlocal:\n  env_file: x\n", encoding="utf-8")
-    assert load_config().mode == "local"
+    (tmp_path / ".dso-secrets" / "config.yml").write_text("mode: isolated\nisolated:\n  env_file: x\n", encoding="utf-8")
+    assert load_config().mode == "isolated"
     monkeypatch.setenv("DSO_SECRETS_CONFIG_YAML", REMOTE_YAML)
     assert load_config().mode == "remote"
 
@@ -174,8 +226,8 @@ def test_config_explicit_path(tmp_path):
     assert load_config(str(other)).mode == "remote"
 
 
-def test_open_store_local(tmp_path):
+def test_open_store_isolated(tmp_path):
     file = tmp_path / "s.env"
     file.write_text("a#k=v\n", encoding="utf-8")
-    cfg = parse_config({"mode": "local", "local": {"env_file": str(file)}})
+    cfg = parse_config({"mode": "isolated", "isolated": {"env_file": str(file)}})
     assert open_store(cfg).get("a", "k") == "v"

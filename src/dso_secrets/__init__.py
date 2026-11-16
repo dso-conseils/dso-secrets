@@ -1,4 +1,4 @@
-"""dso-secrets : CRUD de secrets OVHcloud OKMS (distant) ou lecture d'un fichier local (hors ligne)."""
+"""dso-secrets : CRUD de secrets OVHcloud OKMS ou dans un fichier isolé."""
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Union
@@ -25,7 +25,7 @@ __all__ = [
     "NotFoundError",
     "ReadOnlyError",
 ]
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
 
 class SecretStore:
@@ -63,6 +63,8 @@ class SecretStore:
         self._backend.update(path, data)
 
     def upsert(self, path: str, data: Dict[str, str]) -> str:
+        if isinstance(self._backend, LocalStore):
+            return self._backend.upsert(path, data)
         if self._backend.exists(path):
             self._backend.update(path, data)
             return "updated"
@@ -83,4 +85,6 @@ def open_store(config: Optional[Config] = None, config_path: Optional[str] = Non
     config = config or load_config(config_path)
     if config.mode == "remote":
         return SecretStore(RemoteStore(config.remote))
-    return SecretStore(LocalStore(config.local.env_file))
+    if config.mode != "isolated" or config.isolated is None:
+        raise ConfigError("Configuration du mode isolé absente.")
+    return SecretStore(LocalStore(config.isolated.env_file))

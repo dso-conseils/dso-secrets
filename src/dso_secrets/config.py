@@ -29,7 +29,7 @@ class RemoteConfig:
 
 
 @dataclass(frozen=True)
-class LocalConfig:
+class IsolatedConfig:
     env_file: str
 
 
@@ -37,7 +37,7 @@ class LocalConfig:
 class Config:
     mode: str
     remote: Optional[RemoteConfig] = None
-    local: Optional[LocalConfig] = None
+    isolated: Optional[IsolatedConfig] = None
 
 
 def _reject_secrets(node: Any, trail: str = "") -> None:
@@ -52,7 +52,7 @@ def _reject_secrets(node: Any, trail: str = "") -> None:
 
 def parse_config(data: Mapping[str, Any]) -> Config:
     if not isinstance(data, Mapping):
-        raise ConfigError("Le YAML doit etre un objet (mode: remote|local).")
+        raise ConfigError("Le YAML doit etre un objet (mode: remote|isolated).")
     _reject_secrets(data)
     mode = data.get("mode")
     if mode == "remote":
@@ -66,15 +66,15 @@ def parse_config(data: Mapping[str, Any]) -> Config:
         if unknown:
             raise ConfigError(f"Parametres remote inconnus : {sorted(unknown)}")
         return Config(mode="remote", remote=RemoteConfig(**section))
-    if mode == "local":
-        section = data.get("local") or {}
+    if mode == "isolated":
+        section = data.get("isolated") or {}
         if not section.get("env_file"):
-            raise ConfigError("local.env_file est obligatoire en mode local.")
+            raise ConfigError("isolated.env_file est obligatoire en mode isolé.")
         unknown = set(section) - {"env_file"}
         if unknown:
-            raise ConfigError(f"Parametres local inconnus : {sorted(unknown)}")
-        return Config(mode="local", local=LocalConfig(env_file=str(section["env_file"])))
-    raise ConfigError("mode doit valoir 'remote' ou 'local'.")
+            raise ConfigError(f"Parametres isolated inconnus : {sorted(unknown)}")
+        return Config(mode="isolated", isolated=IsolatedConfig(env_file=str(section["env_file"])))
+    raise ConfigError("mode doit valoir 'remote' ou 'isolated'.")
 
 
 def config_path() -> Path:

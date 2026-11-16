@@ -67,8 +67,8 @@ def init_config(args: argparse.Namespace) -> int:
     target = Path(args.output) if args.output else config_path()
     if target.exists() and not args.force:
         raise DsoSecretsError(f"{target} existe deja : utiliser --force pour le remplacer.")
-    if args.mode == "local":
-        data: Dict[str, object] = {"mode": "local", "local": {"env_file": _ask("Chemin du fichier .env local", True)}}
+    if args.mode == "isolated":
+        data: Dict[str, object] = {"mode": "isolated", "isolated": {"env_file": _ask("Chemin du fichier .env isolé", True)}}
     else:
         remote: Dict[str, object] = {}
         for key, label, required, default in REMOTE_PROMPTS:
@@ -86,7 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     init = sub.add_parser("init", help="creer le YAML (~/.dso-secrets/config.yml) en posant les questions")
-    init.add_argument("--mode", choices=["remote", "local"], default="remote")
+    init.add_argument("--mode", choices=["remote", "isolated"], default="remote")
     init.add_argument("--output", help="ecrire ailleurs que dans ~/.dso-secrets/config.yml")
     init.add_argument("--force", action="store_true", help="remplacer un fichier existant")
 
